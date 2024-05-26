@@ -16,34 +16,38 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
-#include "common.hh"
-#include "scene-manager.hh"
-#include "widgets.hh"
+#include "qapi/error.h"
 #include "main-menu.hh"
+#include "actions.hh"
+#include "common.hh"
 #include "font-manager.hh"
+#include "gl-helpers.hh"
 #include "input-manager.hh"
+#include "misc.hh"
+#include "reporting.hh"
+#include "scene-manager.hh"
 #include "snapshot-manager.hh"
 #include "viewport-manager.hh"
+#include "widgets.hh"
 #include "xemu-hud.h"
-#include "misc.hh"
-#include "gl-helpers.hh"
-#include "reporting.hh"
-#include "qapi/error.h"
-#include "actions.hh"
 
 #include "../xemu-input.h"
-#include "../xemu-notifications.h"
-#include "../xemu-settings.h"
 #include "../xemu-monitor.h"
-#include "../xemu-version.h"
 #include "../xemu-net.h"
+#include "../xemu-notifications.h"
 #include "../xemu-os-utils.h"
+#include "../xemu-settings.h"
+#include "../xemu-version.h"
 #include "../xemu-xbe.h"
 
 MainMenuScene g_main_menu;
 
-MainMenuTabView::~MainMenuTabView() {}
-void MainMenuTabView::Draw() {}
+MainMenuTabView::~MainMenuTabView()
+{
+}
+void MainMenuTabView::Draw()
+{
+}
 
 void MainMenuGeneralView::Draw()
 {
@@ -55,8 +59,9 @@ void MainMenuGeneralView::Draw()
 
 #if defined(__x86_64__)
     SectionTitle("Performance");
-    Toggle("Hard FPU emulation", &g_config.perf.hard_fpu,
-           "Use hardware-accelerated floating point emulation (requires restart)");
+    Toggle(
+        "Hard FPU emulation", &g_config.perf.hard_fpu,
+        "Use hardware-accelerated floating point emulation (requires restart)");
 #endif
 
     Toggle("Cache shaders to disk", &g_config.perf.cache_shaders,
@@ -84,7 +89,7 @@ void MainMenuInputView::Draw()
     float b_x = 0, b_x_stride = 100, b_y = 400;
     float b_w = 68, b_h = 81;
     // Dimensions of controller (rendered at origin)
-    float controller_width  = 477.0f;
+    float controller_width = 477.0f;
     float controller_height = 395.0f;
 
     // Setup rendering to fbo for controller and port images
@@ -120,14 +125,14 @@ void MainMenuInputView::Draw()
         // uses the texture as a unique ID. Push a new ID now to resolve
         // the conflict.
         ImGui::PushID(i);
-        float x = b_x+i*b_x_stride;
-        ImGui::PushStyleColor(ImGuiCol_Button, is_selected ?
-                                                   color_active :
-                                                   color_inactive);
-        bool activated = ImGui::ImageButton(id,
-            ImVec2(b_w*g_viewport_mgr.m_scale,b_h*g_viewport_mgr.m_scale),
-            ImVec2(x/t_w, (b_y+b_h)/t_h),
-            ImVec2((x+b_w)/t_w, b_y/t_h),
+        float x = b_x + i * b_x_stride;
+        ImGui::PushStyleColor(ImGuiCol_Button,
+                              is_selected ? color_active : color_inactive);
+        bool activated = ImGui::ImageButton(
+            id,
+            ImVec2(b_w * g_viewport_mgr.m_scale, b_h * g_viewport_mgr.m_scale),
+            ImVec2(x / t_w, (b_y + b_h) / t_h),
+            ImVec2((x + b_w) / t_w, b_y / t_h),
             port_padding * g_viewport_mgr.m_scale);
         ImGui::PopStyleColor();
 
@@ -168,8 +173,8 @@ void MainMenuInputView::Draw()
     }
 
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::BeginCombo("###InputDevices", name, ImGuiComboFlags_NoArrowButton))
-    {
+    if (ImGui::BeginCombo("###InputDevices", name,
+                          ImGuiComboFlags_NoArrowButton)) {
         // Handle "Not connected"
         bool is_selected = bound_state == NULL;
         if (ImGui::Selectable(not_connected, is_selected)) {
@@ -182,13 +187,14 @@ void MainMenuInputView::Draw()
 
         // Handle all available input devices
         ControllerState *iter;
-        QTAILQ_FOREACH(iter, &available_controllers, entry) {
+        QTAILQ_FOREACH (iter, &available_controllers, entry) {
             is_selected = bound_state == iter;
             ImGui::PushID(iter);
             const char *selectable_label = iter->name;
             char buf[128];
             if (iter->bound >= 0) {
-                snprintf(buf, sizeof(buf), "%s (Port %d)", iter->name, iter->bound+1);
+                snprintf(buf, sizeof(buf), "%s (Port %d)", iter->name,
+                         iter->bound + 1);
                 selectable_label = buf;
             }
             if (ImGui::Selectable(selectable_label, is_selected)) {
@@ -228,7 +234,8 @@ void MainMenuInputView::Draw()
     ImVec2 cur = ImGui::GetCursorPos();
 
     ImVec2 controller_display_size;
-    if (ImGui::GetContentRegionMax().x < controller_width*g_viewport_mgr.m_scale) {
+    if (ImGui::GetContentRegionMax().x <
+        controller_width * g_viewport_mgr.m_scale) {
         controller_display_size.x = ImGui::GetContentRegionMax().x;
         controller_display_size.y =
             controller_display_size.x * controller_height / controller_width;
@@ -242,16 +249,15 @@ void MainMenuInputView::Draw()
         ImGui::GetCursorPosX() +
         (int)((ImGui::GetColumnWidth() - controller_display_size.x) / 2.0));
 
-    ImGui::Image(id,
-        controller_display_size,
-        ImVec2(0, controller_height/t_h),
-        ImVec2(controller_width/t_w, 0));
+    ImGui::Image(id, controller_display_size,
+                 ImVec2(0, controller_height / t_h),
+                 ImVec2(controller_width / t_w, 0));
     ImVec2 pos = ImGui::GetCursorPos();
     if (!device_selected) {
         const char *msg = "Please select an available input device";
         ImVec2 dim = ImGui::CalcTextSize(msg);
-        ImGui::SetCursorPosX(cur.x + (controller_display_size.x-dim.x)/2);
-        ImGui::SetCursorPosY(cur.y + (controller_display_size.y-dim.y)/2);
+        ImGui::SetCursorPosX(cur.x + (controller_display_size.x - dim.x) / 2);
+        ImGui::SetCursorPosY(cur.y + (controller_display_size.y - dim.y) / 2);
         ImGui::Text("%s", msg);
     }
 
@@ -284,7 +290,7 @@ void MainMenuDisplayView::Draw()
                      "9x\0"
                      "10x\0",
                      "Increase surface scaling factor for higher quality")) {
-        nv2a_set_surface_scale_factor(rendering_scale+1);
+        nv2a_set_surface_scale_factor(rendering_scale + 1);
     }
 
     SectionTitle("Window");
@@ -324,8 +330,10 @@ void MainMenuDisplayView::Draw()
         ui_scale_idx = 0;
     } else {
         ui_scale_idx = g_config.display.ui.scale;
-        if (ui_scale_idx < 0) ui_scale_idx = 0;
-        else if (ui_scale_idx > 2) ui_scale_idx = 2;
+        if (ui_scale_idx < 0)
+            ui_scale_idx = 0;
+        else if (ui_scale_idx > 2)
+            ui_scale_idx = 2;
     }
     if (ChevronCombo("UI scale", &ui_scale_idx,
                      "Auto\0"
@@ -341,11 +349,12 @@ void MainMenuDisplayView::Draw()
     }
     Toggle("Animations", &g_config.display.ui.use_animations,
            "Enable xemu user interface animations");
-    ChevronCombo("Display mode", &g_config.display.ui.fit,
-                 "Center\0"
-                 "Scale\0"
-                 "Stretch\0",
-                 "Select how the framebuffer should fit or scale into the window");
+    ChevronCombo(
+        "Display mode", &g_config.display.ui.fit,
+        "Center\0"
+        "Scale\0"
+        "Stretch\0",
+        "Select how the framebuffer should fit or scale into the window");
     ChevronCombo("Aspect ratio", &g_config.display.ui.aspect_ratio,
                  "Native\0"
                  "Auto (Default)\0"
@@ -365,7 +374,6 @@ void MainMenuAudioView::Draw()
     SectionTitle("Quality");
     Toggle("Real-time DSP processing", &g_config.audio.use_dsp,
            "Enable improved audio accuracy (experimental)");
-
 }
 
 NetworkInterface::NetworkInterface(pcap_if_t *pcap_desc, char *_friendlyname)
@@ -411,7 +419,7 @@ void NetworkInterfaceManager::Refresh(void)
         return;
     }
 
-    for (iter=alldevs; iter != NULL; iter=iter->next) {
+    for (iter = alldevs; iter != NULL; iter = iter->next) {
 #if defined(_WIN32)
         char *friendly_name = get_windows_interface_friendly_name(iter->name);
         m_ifaces.emplace_back(new NetworkInterface(iter, friendly_name));
@@ -463,7 +471,8 @@ void MainMenuNetworkView::Draw()
     }
 
     bool appearing = ImGui::IsWindowAppearing();
-    if (enabled) ImGui::BeginDisabled();
+    if (enabled)
+        ImGui::BeginDisabled();
     if (ChevronCombo(
             "Attached to", &g_config.net.backend,
             "NAT\0"
@@ -483,9 +492,11 @@ void MainMenuNetworkView::Draw()
     case CONFIG_NET_BACKEND_UDP:
         DrawUdpOptions(appearing);
         break;
-    default: break;
+    default:
+        break;
     }
-    if (enabled) ImGui::EndDisabled();
+    if (enabled)
+        ImGui::EndDisabled();
 }
 
 void MainMenuNetworkView::DrawPcapOptions(bool appearing)
@@ -500,9 +511,11 @@ void MainMenuNetworkView::DrawPcapOptions(bool appearing)
         const char *msg = "npcap library could not be loaded.\n"
                           "To use this backend, please install npcap.";
         ImGui::Text("%s", msg);
-        ImGui::Dummy(ImVec2(0,10*g_viewport_mgr.m_scale));
-        ImGui::SetCursorPosX((ImGui::GetWindowWidth()-120*g_viewport_mgr.m_scale)/2);
-        if (ImGui::Button("Install npcap", ImVec2(120*g_viewport_mgr.m_scale, 0))) {
+        ImGui::Dummy(ImVec2(0, 10 * g_viewport_mgr.m_scale));
+        ImGui::SetCursorPosX(
+            (ImGui::GetWindowWidth() - 120 * g_viewport_mgr.m_scale) / 2);
+        if (ImGui::Button("Install npcap",
+                          ImVec2(120 * g_viewport_mgr.m_scale, 0))) {
             xemu_open_web_browser("https://nmap.org/npcap/");
         }
 #endif
@@ -534,7 +547,8 @@ void MainMenuNetworkView::DrawPcapOptions(bool appearing)
                                       is_selected)) {
                     iface_mgr->Select((*iface));
                 }
-                if (is_selected) ImGui::SetItemDefaultFocus();
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
                 ImGui::PopID();
             }
             ImGui::EndCombo();
@@ -548,22 +562,22 @@ void MainMenuNetworkView::DrawPcapOptions(bool appearing)
 
 void MainMenuNetworkView::DrawNatOptions(bool appearing)
 {
-    static ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
+    static ImGuiTableFlags flags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
     WidgetTitleDescriptionItem(
         "Port Forwarding",
         "Configure xemu to forward connections to guest on these ports");
     float p = ImGui::GetFrameHeight() * 0.3;
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(p, p));
-    if (ImGui::BeginTable("port_forward_tbl", 4, flags))
-    {
+    if (ImGui::BeginTable("port_forward_tbl", 4, flags)) {
         ImGui::TableSetupColumn("Host Port");
         ImGui::TableSetupColumn("Guest Port");
         ImGui::TableSetupColumn("Protocol");
         ImGui::TableSetupColumn("Action");
         ImGui::TableHeadersRow();
 
-        for (unsigned int row = 0; row < g_config.net.nat.forward_ports_count; row++)
-        {
+        for (unsigned int row = 0; row < g_config.net.nat.forward_ports_count;
+             row++) {
             ImGui::TableNextRow();
 
             ImGui::TableSetColumnIndex(0);
@@ -575,10 +589,13 @@ void MainMenuNetworkView::DrawNatOptions(bool appearing)
             ImGui::TableSetColumnIndex(2);
             switch (g_config.net.nat.forward_ports[row].protocol) {
             case CONFIG_NET_NAT_FORWARD_PORTS_PROTOCOL_TCP:
-                ImGui::TextUnformatted("TCP"); break;
+                ImGui::TextUnformatted("TCP");
+                break;
             case CONFIG_NET_NAT_FORWARD_PORTS_PROTOCOL_UDP:
-                ImGui::TextUnformatted("UDP"); break;
-            default: assert(0);
+                ImGui::TextUnformatted("UDP");
+                break;
+            default:
+                assert(0);
             }
 
             ImGui::TableSetColumnIndex(3);
@@ -592,12 +609,12 @@ void MainMenuNetworkView::DrawNatOptions(bool appearing)
         ImGui::TableNextRow();
 
         ImGui::TableSetColumnIndex(0);
-        static char buf[8] = {"1234"};
+        static char buf[8] = { "1234" };
         ImGui::SetNextItemWidth(ImGui::GetColumnWidth());
         ImGui::InputText("###hostport", buf, sizeof(buf));
 
         ImGui::TableSetColumnIndex(1);
-        static char buf2[8] = {"1234"};
+        static char buf2[8] = { "1234" };
         ImGui::SetNextItemWidth(ImGui::GetColumnWidth());
         ImGui::InputText("###guestport", buf2, sizeof(buf2));
 
@@ -625,8 +642,9 @@ void MainMenuNetworkView::DrawNatOptions(bool appearing)
 void MainMenuNetworkView::DrawUdpOptions(bool appearing)
 {
     if (appearing) {
-        strncpy(remote_addr, g_config.net.udp.remote_addr, sizeof(remote_addr)-1);
-        strncpy(local_addr, g_config.net.udp.bind_addr, sizeof(local_addr)-1);
+        strncpy(remote_addr, g_config.net.udp.remote_addr,
+                sizeof(remote_addr) - 1);
+        strncpy(local_addr, g_config.net.udp.bind_addr, sizeof(local_addr) - 1);
     }
 
     float size_ratio = 0.5;
@@ -663,7 +681,9 @@ MainMenuSnapshotsView::~MainMenuSnapshotsView()
     g_free(m_search_regex);
 }
 
-bool MainMenuSnapshotsView::BigSnapshotButton(QEMUSnapshotInfo *snapshot, XemuSnapshotData *data, int current_snapshot_binding)
+bool MainMenuSnapshotsView::BigSnapshotButton(QEMUSnapshotInfo *snapshot,
+                                              XemuSnapshotData *data,
+                                              int current_snapshot_binding)
 {
     ImGuiStyle &style = ImGui::GetStyle();
     ImDrawList *draw_list = ImGui::GetWindowDrawList();
@@ -673,18 +693,27 @@ bool MainMenuSnapshotsView::BigSnapshotButton(QEMUSnapshotInfo *snapshot, XemuSn
     ImGui::PopFont();
 
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0, 0));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, g_viewport_mgr.Scale(ImVec2(5, 5)));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        g_viewport_mgr.Scale(ImVec2(5, 5)));
 
     ImGui::PushFont(g_font_mgr.m_menu_font_medium);
 
     ImVec2 ts_title = ImGui::CalcTextSize(snapshot->name);
-    ImVec2 thumbnail_size = g_viewport_mgr.Scale(ImVec2(XEMU_SNAPSHOT_THUMBNAIL_WIDTH, XEMU_SNAPSHOT_THUMBNAIL_HEIGHT));
+    ImVec2 thumbnail_size = g_viewport_mgr.Scale(
+        ImVec2(XEMU_SNAPSHOT_THUMBNAIL_WIDTH, XEMU_SNAPSHOT_THUMBNAIL_HEIGHT));
     ImVec2 thumbnail_pos(style.FramePadding.x, style.FramePadding.y);
-    ImVec2 name_pos(thumbnail_pos.x + thumbnail_size.x + style.FramePadding.x * 2, thumbnail_pos.y);
-    ImVec2 title_pos(name_pos.x, name_pos.y + ts_title.y + style.FramePadding.x);
-    ImVec2 date_pos(name_pos.x, title_pos.y + ts_title.y + style.FramePadding.x);
-    ImVec2 binding_pos(name_pos.x, date_pos.y + ts_title.y + style.FramePadding.x);
-    ImVec2 button_size(-FLT_MIN, fmax(thumbnail_size.y + style.FramePadding.y * 2, ts_title.y + ts_sub.y + style.FramePadding.y * 3));
+    ImVec2 name_pos(thumbnail_pos.x + thumbnail_size.x +
+                        style.FramePadding.x * 2,
+                    thumbnail_pos.y);
+    ImVec2 title_pos(name_pos.x,
+                     name_pos.y + ts_title.y + style.FramePadding.x);
+    ImVec2 date_pos(name_pos.x,
+                    title_pos.y + ts_title.y + style.FramePadding.x);
+    ImVec2 binding_pos(name_pos.x,
+                       date_pos.y + ts_title.y + style.FramePadding.x);
+    ImVec2 button_size(-FLT_MIN,
+                       fmax(thumbnail_size.y + style.FramePadding.y * 2,
+                            ts_title.y + ts_sub.y + style.FramePadding.y * 3));
 
     bool load = ImGui::Button("###button", button_size);
 
@@ -699,42 +728,55 @@ bool MainMenuSnapshotsView::BigSnapshotButton(QEMUSnapshotInfo *snapshot, XemuSn
     int thumbnail_width, thumbnail_height;
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, thumbnail);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &thumbnail_width);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &thumbnail_height);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,
+                             &thumbnail_width);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT,
+                             &thumbnail_height);
 
     // Draw black background behind thumbnail
     ImVec2 thumbnail_min(p0.x + thumbnail_pos.x, p0.y + thumbnail_pos.y);
-    ImVec2 thumbnail_max(thumbnail_min.x + thumbnail_size.x, thumbnail_min.y + thumbnail_size.y);
+    ImVec2 thumbnail_max(thumbnail_min.x + thumbnail_size.x,
+                         thumbnail_min.y + thumbnail_size.y);
     draw_list->AddRectFilled(thumbnail_min, thumbnail_max, IM_COL32_BLACK);
 
     // Draw centered thumbnail image
     int scaled_width, scaled_height;
-    ScaleDimensions(thumbnail_width, thumbnail_height, thumbnail_size.x, thumbnail_size.y, &scaled_width, &scaled_height);
-    ImVec2 img_min = ImVec2(thumbnail_min.x + (thumbnail_size.x - scaled_width) / 2,
-                            thumbnail_min.y + (thumbnail_size.y - scaled_height) / 2);
-    ImVec2 img_max = ImVec2(img_min.x + scaled_width, img_min.y + scaled_height);
+    ScaleDimensions(thumbnail_width, thumbnail_height, thumbnail_size.x,
+                    thumbnail_size.y, &scaled_width, &scaled_height);
+    ImVec2 img_min =
+        ImVec2(thumbnail_min.x + (thumbnail_size.x - scaled_width) / 2,
+               thumbnail_min.y + (thumbnail_size.y - scaled_height) / 2);
+    ImVec2 img_max =
+        ImVec2(img_min.x + scaled_width, img_min.y + scaled_height);
     draw_list->AddImage((ImTextureID)(uint64_t)thumbnail, img_min, img_max);
 
     // Snapshot title
     ImGui::PushFont(g_font_mgr.m_menu_font_medium);
-    draw_list->AddText(ImVec2(p0.x + name_pos.x, p0.y + name_pos.y), IM_COL32(255, 255, 255, 255), snapshot->name);
+    draw_list->AddText(ImVec2(p0.x + name_pos.x, p0.y + name_pos.y),
+                       IM_COL32(255, 255, 255, 255), snapshot->name);
     ImGui::PopFont();
 
     // Snapshot XBE title name
     ImGui::PushFont(g_font_mgr.m_menu_font_small);
-    const char *title_name = data->xbe_title_name ? data->xbe_title_name : "(Unknown XBE Title Name)";
-    draw_list->AddText(ImVec2(p0.x + title_pos.x, p0.y + title_pos.y), IM_COL32(255, 255, 255, 200), title_name);
+    const char *title_name = data->xbe_title_name ? data->xbe_title_name :
+                                                    "(Unknown XBE Title Name)";
+    draw_list->AddText(ImVec2(p0.x + title_pos.x, p0.y + title_pos.y),
+                       IM_COL32(255, 255, 255, 200), title_name);
 
     // Snapshot date
-    g_autoptr(GDateTime) date = g_date_time_new_from_unix_local(snapshot->date_sec);
+    g_autoptr(GDateTime) date =
+        g_date_time_new_from_unix_local(snapshot->date_sec);
     char *date_buf = g_date_time_format(date, "%Y-%m-%d %H:%M:%S");
-    draw_list->AddText(ImVec2(p0.x + date_pos.x, p0.y + date_pos.y), IM_COL32(255, 255, 255, 200), date_buf);
+    draw_list->AddText(ImVec2(p0.x + date_pos.x, p0.y + date_pos.y),
+                       IM_COL32(255, 255, 255, 200), date_buf);
     g_free(date_buf);
 
     // Snapshot keyboard binding
     if (current_snapshot_binding != -1) {
-        char *binding_text = g_strdup_printf("Bound to F%d", current_snapshot_binding + 5);
-        draw_list->AddText(ImVec2(p0.x + binding_pos.x, p0.y + binding_pos.y), IM_COL32(255, 255, 255, 200), binding_text);
+        char *binding_text =
+            g_strdup_printf("Bound to F%d", current_snapshot_binding + 5);
+        draw_list->AddText(ImVec2(p0.x + binding_pos.x, p0.y + binding_pos.y),
+                           IM_COL32(255, 255, 255, 200), binding_text);
         g_free(binding_text);
     }
 
@@ -758,7 +800,7 @@ void MainMenuSnapshotsView::ClearSearch()
 int MainMenuSnapshotsView::OnSearchTextUpdate(ImGuiInputTextCallbackData *data)
 {
     GError *gerr = NULL;
-    MainMenuSnapshotsView *win = (MainMenuSnapshotsView*)data->UserData;
+    MainMenuSnapshotsView *win = (MainMenuSnapshotsView *)data->UserData;
 
     if (win->m_search_regex) {
         g_free(win->m_search_regex);
@@ -770,7 +812,8 @@ int MainMenuSnapshotsView::OnSearchTextUpdate(ImGuiInputTextCallbackData *data)
     }
 
     char *buf = g_strdup_printf("(.*)%s(.*)", data->Buf);
-    win->m_search_regex = g_regex_new(buf, (GRegexCompileFlags)0, (GRegexMatchFlags)0, &gerr);
+    win->m_search_regex =
+        g_regex_new(buf, (GRegexCompileFlags)0, (GRegexMatchFlags)0, &gerr);
     g_free(buf);
     if (gerr) {
         win->m_search_regex = NULL;
@@ -785,14 +828,17 @@ void MainMenuSnapshotsView::Draw()
     g_snapshot_mgr.Refresh();
 
     SectionTitle("Snapshots");
-    Toggle("Filter by current title", &g_config.general.snapshots.filter_current_game,
-           "Only display snapshots created while running the currently running XBE");
+    Toggle("Filter by current title",
+           &g_config.general.snapshots.filter_current_game,
+           "Only display snapshots created while running the currently running "
+           "XBE");
 
     if (g_config.general.snapshots.filter_current_game) {
         struct xbe *xbe = xemu_get_xbe_info();
         if (xbe && xbe->cert) {
             if (xbe->cert->m_titleid != m_current_title_id) {
-                char *title_name = g_utf16_to_utf8(xbe->cert->m_title_name, 40, NULL, NULL, NULL);
+                char *title_name = g_utf16_to_utf8(xbe->cert->m_title_name, 40,
+                                                   NULL, NULL, NULL);
                 if (title_name) {
                     m_current_title_name = title_name;
                     g_free(title_name);
@@ -816,7 +862,8 @@ void MainMenuSnapshotsView::Draw()
 
     bool snapshot_with_create_name_exists = false;
     for (int i = 0; i < g_snapshot_mgr.m_snapshots_len; ++i) {
-        if (g_strcmp0(m_search_buf.c_str(), g_snapshot_mgr.m_snapshots[i].name) == 0) {
+        if (g_strcmp0(m_search_buf.c_str(),
+                      g_snapshot_mgr.m_snapshots[i].name) == 0) {
             snapshot_with_create_name_exists = true;
             break;
         }
@@ -828,8 +875,10 @@ void MainMenuSnapshotsView::Draw()
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 0, 0, 1));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1, 0, 0, 1));
     }
-    if (ImGui::Button(snapshot_with_create_name_exists ? "Replace" : "Create", ImVec2(-FLT_MIN, 0))) {
-        xemu_snapshots_save(m_search_buf.empty() ? NULL : m_search_buf.c_str(), NULL);
+    if (ImGui::Button(snapshot_with_create_name_exists ? "Replace" : "Create",
+                      ImVec2(-FLT_MIN, 0))) {
+        xemu_snapshots_save(m_search_buf.empty() ? NULL : m_search_buf.c_str(),
+                            NULL);
         ClearSearch();
     }
     if (snapshot_with_create_name_exists) {
@@ -837,28 +886,36 @@ void MainMenuSnapshotsView::Draw()
     }
 
     if (snapshot_with_create_name_exists && ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("A snapshot with the name \"%s\" already exists. This button will overwrite the existing snapshot.", m_search_buf.c_str());
+        ImGui::SetTooltip("A snapshot with the name \"%s\" already exists. "
+                          "This button will overwrite the existing snapshot.",
+                          m_search_buf.c_str());
     }
     ImGui::PopFont();
 
     bool at_least_one_snapshot_displayed = false;
 
     for (int i = g_snapshot_mgr.m_snapshots_len - 1; i >= 0; i--) {
-        if (g_config.general.snapshots.filter_current_game && g_snapshot_mgr.m_extra_data[i].xbe_title_name && 
-            m_current_title_name.size() && strcmp(m_current_title_name.c_str(), g_snapshot_mgr.m_extra_data[i].xbe_title_name)) {
+        if (g_config.general.snapshots.filter_current_game &&
+            g_snapshot_mgr.m_extra_data[i].xbe_title_name &&
+            m_current_title_name.size() &&
+            strcmp(m_current_title_name.c_str(),
+                   g_snapshot_mgr.m_extra_data[i].xbe_title_name)) {
             continue;
         }
 
         if (m_search_regex) {
             GMatchInfo *match;
             bool keep_entry = false;
-        
-            g_regex_match(m_search_regex, g_snapshot_mgr.m_snapshots[i].name, (GRegexMatchFlags)0, &match);
+
+            g_regex_match(m_search_regex, g_snapshot_mgr.m_snapshots[i].name,
+                          (GRegexMatchFlags)0, &match);
             keep_entry |= g_match_info_matches(match);
             g_match_info_free(match);
 
             if (g_snapshot_mgr.m_extra_data[i].xbe_title_name) {
-                g_regex_match(m_search_regex, g_snapshot_mgr.m_extra_data[i].xbe_title_name, (GRegexMatchFlags)0, &match);
+                g_regex_match(m_search_regex,
+                              g_snapshot_mgr.m_extra_data[i].xbe_title_name,
+                              (GRegexMatchFlags)0, &match);
                 keep_entry |= g_match_info_matches(match);
                 g_free(match);
             }
@@ -873,7 +930,8 @@ void MainMenuSnapshotsView::Draw()
 
         int current_snapshot_binding = -1;
         for (int i = 0; i < 4; ++i) {
-            if (g_strcmp0(*(g_snapshot_shortcut_index_key_map[i]), snapshot->name) == 0) {
+            if (g_strcmp0(*(g_snapshot_shortcut_index_key_map[i]),
+                          snapshot->name) == 0) {
                 assert(current_snapshot_binding == -1);
                 current_snapshot_binding = i;
             }
@@ -885,13 +943,14 @@ void MainMenuSnapshotsView::Draw()
         bool load = BigSnapshotButton(snapshot, data, current_snapshot_binding);
 
         // FIXME: Provide context menu control annotation
-        if (ImGui::IsItemHovered() && ImGui::IsKeyPressed(ImGuiKey_GamepadFaceLeft)) {
+        if (ImGui::IsItemHovered() &&
+            ImGui::IsKeyPressed(ImGuiKey_GamepadFaceLeft)) {
             ImGui::SetNextWindowPos(pos);
             ImGui::OpenPopup("Snapshot Options");
         }
-    
+
         DrawSnapshotContextMenu(snapshot, data, current_snapshot_binding);
-        
+
         ImGui::PopID();
 
         if (load) {
@@ -915,12 +974,14 @@ void MainMenuSnapshotsView::Draw()
         }
         ImVec2 dim = ImGui::CalcTextSize(msg);
         ImVec2 cur = ImGui::GetCursorPos();
-        ImGui::SetCursorPosX(cur.x + (ImGui::GetColumnWidth()-dim.x)/2);
+        ImGui::SetCursorPosX(cur.x + (ImGui::GetColumnWidth() - dim.x) / 2);
         ImGui::TextColored(ImVec4(0.94f, 0.94f, 0.94f, 0.70f), "%s", msg);
     }
 }
 
-void MainMenuSnapshotsView::DrawSnapshotContextMenu(QEMUSnapshotInfo *snapshot, XemuSnapshotData *data, int current_snapshot_binding)
+void MainMenuSnapshotsView::DrawSnapshotContextMenu(
+    QEMUSnapshotInfo *snapshot, XemuSnapshotData *data,
+    int current_snapshot_binding)
 {
     if (!ImGui::BeginPopupContextItem("Snapshot Options")) {
         return;
@@ -936,9 +997,12 @@ void MainMenuSnapshotsView::DrawSnapshotContextMenu(QEMUSnapshotInfo *snapshot, 
 
             if (ImGui::MenuItem(item_name)) {
                 if (current_snapshot_binding >= 0) {
-                    xemu_settings_set_string(g_snapshot_shortcut_index_key_map[current_snapshot_binding], "");
+                    xemu_settings_set_string(g_snapshot_shortcut_index_key_map
+                                                 [current_snapshot_binding],
+                                             "");
                 }
-                xemu_settings_set_string(g_snapshot_shortcut_index_key_map[i], snapshot->name);
+                xemu_settings_set_string(g_snapshot_shortcut_index_key_map[i],
+                                         snapshot->name);
                 current_snapshot_binding = i;
 
                 ImGui::CloseCurrentPopup();
@@ -949,13 +1013,15 @@ void MainMenuSnapshotsView::DrawSnapshotContextMenu(QEMUSnapshotInfo *snapshot, 
 
         if (current_snapshot_binding >= 0) {
             if (ImGui::MenuItem("Unbind")) {
-                xemu_settings_set_string(g_snapshot_shortcut_index_key_map[current_snapshot_binding], "");
+                xemu_settings_set_string(
+                    g_snapshot_shortcut_index_key_map[current_snapshot_binding],
+                    "");
                 current_snapshot_binding = -1;
             }
         }
         ImGui::EndMenu();
     }
-    
+
     ImGui::Separator();
 
     Error *err = NULL;
@@ -982,11 +1048,13 @@ MainMenuSystemView::MainMenuSystemView() : m_dirty(false)
 
 void MainMenuSystemView::Draw()
 {
-    const char *rom_file_filters = ".bin Files\0*.bin\0.rom Files\0*.rom\0All Files\0*.*\0";
+    const char *rom_file_filters =
+        ".bin Files\0*.bin\0.rom Files\0*.rom\0All Files\0*.*\0";
     const char *qcow_file_filters = ".qcow2 Files\0*.qcow2\0All Files\0*.*\0";
 
     if (m_dirty) {
-        ImGui::TextColored(ImVec4(1,0,0,1), "Application restart required to apply settings");
+        ImGui::TextColored(ImVec4(1, 0, 0, 1),
+                           "Application restart required to apply settings");
     }
 
     if ((int)g_config.sys.avpack == CONFIG_SYS_AVPACK_NONE) {
@@ -998,7 +1066,8 @@ void MainMenuSystemView::Draw()
 
     if (ChevronCombo(
             "System Memory", &g_config.sys.mem_limit,
-            "64 MiB (Default)\0""128 MiB\0",
+            "64 MiB (Default)\0"
+            "128 MiB\0",
             "Increase to 128 MiB for debug or homebrew applications")) {
         m_dirty = true;
     }
@@ -1031,8 +1100,9 @@ void MainMenuSystemView::Draw()
     }
 }
 
-MainMenuAboutView::MainMenuAboutView(): m_config_info_text{NULL}
-{}
+MainMenuAboutView::MainMenuAboutView() : m_config_info_text{ NULL }
+{
+}
 
 void MainMenuAboutView::UpdateConfigInfoText()
 {
@@ -1040,20 +1110,21 @@ void MainMenuAboutView::UpdateConfigInfoText()
         g_free(m_config_info_text);
     }
 
-    gchar *bootrom_checksum = GetFileMD5Checksum(g_config.sys.files.bootrom_path);
+    gchar *bootrom_checksum =
+        GetFileMD5Checksum(g_config.sys.files.bootrom_path);
     if (!bootrom_checksum) {
         bootrom_checksum = g_strdup("None");
     }
 
-    gchar *flash_rom_checksum = GetFileMD5Checksum(g_config.sys.files.flashrom_path);
+    gchar *flash_rom_checksum =
+        GetFileMD5Checksum(g_config.sys.files.flashrom_path);
     if (!flash_rom_checksum) {
         flash_rom_checksum = g_strdup("None");
     }
 
-    m_config_info_text = g_strdup_printf(
-            "MCPX Boot ROM MD5 Hash:        %s\n"
-            "Flash ROM (BIOS) MD5 Hash:     %s",
-            bootrom_checksum, flash_rom_checksum);
+    m_config_info_text = g_strdup_printf("MCPX Boot ROM MD5 Hash:        %s\n"
+                                         "Flash ROM (BIOS) MD5 Hash:     %s",
+                                         bootrom_checksum, flash_rom_checksum);
     g_free(bootrom_checksum);
     g_free(flash_rom_checksum);
 }
@@ -1062,22 +1133,25 @@ void MainMenuAboutView::Draw()
 {
     static const char *build_info_text = NULL;
     if (build_info_text == NULL) {
-        build_info_text = g_strdup_printf(
-            "Version:      %s\nBranch:       %s\nCommit:       %s\nDate:         %s",
-            xemu_version, xemu_branch, xemu_commit, xemu_date);
+        build_info_text =
+            g_strdup_printf("Version:      %s\nBranch:       %s\nCommit:       "
+                            "%s\nDate:         %s",
+                            xemu_version, xemu_branch, xemu_commit, xemu_date);
     }
 
     static const char *sys_info_text = NULL;
     if (sys_info_text == NULL) {
-        const char *gl_shader_version = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
-        const char *gl_version = (const char*)glGetString(GL_VERSION);
-        const char *gl_renderer = (const char*)glGetString(GL_RENDERER);
-        const char *gl_vendor = (const char*)glGetString(GL_VENDOR);
+        const char *gl_shader_version =
+            (const char *)glGetString(GL_SHADING_LANGUAGE_VERSION);
+        const char *gl_version = (const char *)glGetString(GL_VERSION);
+        const char *gl_renderer = (const char *)glGetString(GL_RENDERER);
+        const char *gl_vendor = (const char *)glGetString(GL_VENDOR);
         sys_info_text = g_strdup_printf(
-            "CPU:          %s\nOS Platform:  %s\nOS Version:   %s\nManufacturer: %s\n"
+            "CPU:          %s\nOS Platform:  %s\nOS Version:   "
+            "%s\nManufacturer: %s\n"
             "GPU Model:    %s\nDriver:       %s\nShader:       %s",
-             xemu_get_cpu_info(), xemu_get_os_platform(), xemu_get_os_info(), gl_vendor,
-             gl_renderer, gl_version, gl_shader_version);
+            xemu_get_cpu_info(), xemu_get_os_platform(), xemu_get_os_info(),
+            gl_vendor, gl_renderer, gl_version, gl_shader_version);
     }
 
     if (m_config_info_text == NULL) {
@@ -1122,7 +1196,7 @@ void MainMenuAboutView::Draw()
 }
 
 MainMenuTabButton::MainMenuTabButton(std::string text, std::string icon)
-: m_icon(icon), m_text(text)
+    : m_icon(icon), m_text(text)
 {
 }
 
@@ -1135,8 +1209,10 @@ bool MainMenuTabButton::Draw(bool selected)
                     IM_COL32(0, 0, 0, 0);
 
     ImGui::PushStyleColor(ImGuiCol_Button, col);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, selected ? col : IM_COL32(32, 32, 32, 255));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, selected ? col : IM_COL32(32, 32, 32, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                          selected ? col : IM_COL32(32, 32, 32, 255));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                          selected ? col : IM_COL32(32, 32, 32, 255));
     int p = ImGui::GetTextLineHeight() * 0.5;
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(p, p));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0);
@@ -1155,15 +1231,14 @@ bool MainMenuTabButton::Draw(bool selected)
 }
 
 MainMenuScene::MainMenuScene()
-: m_animation(0.12, 0.12),
-  m_general_button("General",     ICON_FA_GEARS),
-  m_input_button("Input",         ICON_FA_GAMEPAD),
-  m_display_button("Display",     ICON_FA_TV),
-  m_audio_button("Audio",         ICON_FA_VOLUME_HIGH),
-  m_network_button("Network",     ICON_FA_NETWORK_WIRED),
-  m_snapshots_button("Snapshots", ICON_FA_CLOCK_ROTATE_LEFT),
-  m_system_button("System",       ICON_FA_MICROCHIP),
-  m_about_button("About",         ICON_FA_CIRCLE_INFO)
+    : m_animation(0.12, 0.12), m_general_button("General", ICON_FA_GEARS),
+      m_input_button("Input", ICON_FA_GAMEPAD),
+      m_display_button("Display", ICON_FA_TV),
+      m_audio_button("Audio", ICON_FA_VOLUME_HIGH),
+      m_network_button("Network", ICON_FA_NETWORK_WIRED),
+      m_snapshots_button("Snapshots", ICON_FA_CLOCK_ROTATE_LEFT),
+      m_system_button("System", ICON_FA_MICROCHIP),
+      m_about_button("About", ICON_FA_CIRCLE_INFO)
 {
     m_had_focus_last_frame = false;
     m_focus_view = false;
@@ -1250,11 +1325,12 @@ void MainMenuScene::HandleInput()
     bool focus = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows |
                                         ImGuiFocusedFlags_NoPopupHierarchy);
 
-    // XXX: Ensure we have focus for two frames. If a user cancels a popup window, we do not want to cancel main
+    // XXX: Ensure we have focus for two frames. If a user cancels a popup
+    // window, we do not want to cancel main
     //      window as well.
     if (nofocus || (focus && m_had_focus_last_frame &&
-                    (ImGui::IsKeyDown(ImGuiKey_GamepadFaceRight)
-                     || ImGui::IsKeyDown(ImGuiKey_Escape)))) {
+                    (ImGui::IsKeyDown(ImGuiKey_GamepadFaceRight) ||
+                     ImGui::IsKeyDown(ImGuiKey_Escape)))) {
         Hide();
         return;
     }
@@ -1314,9 +1390,10 @@ bool MainMenuScene::Draw()
         float nav_width = width * 0.3;
         float content_width = width - nav_width;
 
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(26,26,26,255));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(26, 26, 26, 255));
 
-        ImGui::BeginChild("###MainWindowNav", ImVec2(nav_width, -1), true, ImGuiWindowFlags_NavFlattened);
+        ImGui::BeginChild("###MainWindowNav", ImVec2(nav_width, -1), true,
+                          ImGuiWindowFlags_NavFlattened);
 
         bool move_focus_to_tab = false;
         if (m_current_view_index != m_next_view_index) {
@@ -1350,7 +1427,8 @@ bool MainMenuScene::Draw()
         int s = ImGui::GetTextLineHeight() * 0.75;
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(s, s));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(s, s));
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 6*g_viewport_mgr.m_scale);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,
+                            6 * g_viewport_mgr.m_scale);
 
         ImGui::PushID(m_current_view_index);
         ImGui::BeginChild("###MainWindowContent", ImVec2(content_width, -1),
@@ -1365,7 +1443,9 @@ bool MainMenuScene::Draw()
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 128));
             ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32_BLACK_TRANS);
             ImVec2 pos = ImGui::GetCursorPos();
-            ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - style.FramePadding.x * 2.0f - ImGui::GetTextLineHeight());
+            ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x -
+                                 style.FramePadding.x * 2.0f -
+                                 ImGui::GetTextLineHeight());
             if (ImGui::Button(ICON_FA_XMARK)) {
                 Hide();
             }
